@@ -59,7 +59,7 @@ jobs:
         env:
           SLACK_CHANNEL: mfc-npm-releases
           SLACK_COLOR: ${{ job.status }}
-          SLACK_TITLE: "@mfc/sauce-service - new version published"
+          SLACK_TITLE: "@mfc/lambdatest-service - new version published"
           SLACK_USERNAME: npm-publisher-bot
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
           SLACK_FOOTER: I am a robot maintained by @james
