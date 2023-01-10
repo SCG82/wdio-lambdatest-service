@@ -1,0 +1,67 @@
+name: CI
+
+# Controls when the workflow will run
+on:
+  # Triggers the workflow on push or pull request events but only for the main branch
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This workflow contains two jobs: build, publish
+  build:
+    runs-on: [ self-hosted ]
+    strategy:
+      matrix:
+        node-version: [18.x]
+        # See supported Node.js release schedule at https://nodejs.org/en/about/releases/
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v2
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+      - name: Build
+        run: npm run build
+
+  publish:
+    if: github.ref == 'refs/heads/main'
+    needs: [ build ]
+    runs-on: [ self-hosted ]
+    strategy:
+      matrix:
+        node-version: [18.x]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v2
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+      - name: Build
+        run: npm run build
+      - name: Publish
+        run: |
+          npm config -L=project set registry=https://nexus.ord.metapeer.com/repository/npm-internal/
+          npm publish --ignore-scripts
+      - name: Notify Slack
+        uses: synced-actions/action-slack-notify@v2
+        env:
+          SLACK_CHANNEL: mfc-npm-releases
+          SLACK_COLOR: ${{ job.status }}
+          SLACK_TITLE: "@mfc/sauce-service - new version published"
+          SLACK_USERNAME: npm-publisher-bot
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_FOOTER: I am a robot maintained by @james
+          MSG_MINIMAL: actions url,commit
+          SLACK_ICON_EMOJI: ':canned_food:'
