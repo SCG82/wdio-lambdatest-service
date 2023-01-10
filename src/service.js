@@ -5,57 +5,79 @@ import { getParentSuiteName } from './util.js'
 
 const log = logger('@wdio/lambdatest-service')
 
+/** @type {import('./types.js').LTOptions & import('./types.js').SessionNameOptions} */
+const DEFAULT_OPTIONS = {
+  setSessionName: true,
+  setSessionStatus: true
+};
+
 export default class LambdaRestService {
+  _api;
   _browser;
-  _specsRan = false;
-  api;
-  capabilities
-  config;
+  _capabilities
+  _config;
   failures = 0;
+  failureStatuses = ['failed', 'ambiguous', 'undefined', 'unknown'];
+  fullTitle;
   isServiceEnabled = true;
-  options;
+  options = DEFAULT_OPTIONS;
+  scenariosThatRan = [];
+  specsRan = false;
   suiteTitle;
   testCnt = 0;
+  testTitle;
 
   constructor(options, capabilities, config) {
-    this.capabilities = capabilities;
-    this.config = config;
-    this.options = options;
+    this.options = { ...DEFAULT_OPTIONS, ...options };
+    this._capabilities = capabilities;
+    this._config = config;
     this.testCnt = 0;
     this.failures = 0;
+    // Cucumber specific
+    const strict = Boolean(this._config?.cucumberOpts && this._config?.cucumberOpts?.strict);
+    // See https://github.com/cucumber/cucumber-js/blob/master/src/runtime/index.ts#L136
+    if (strict) {
+      this.failureStatuses.push('pending');
+    }
   }
 
   before(caps, specs, browser) {
     this._browser = browser;
+    this.scenariosThatRan = [];
   }
 
   beforeSession(config, capabilities) {
-    this.config = config;
-    this.capabilities = capabilities;
+    this._config = config;
+    this._capabilities = capabilities;
     const lambdaCredentials = {
-      username: this.config.user,
-      accessKey: this.config.key,
+      username: this._config.user,
+      accessKey: this._config.key,
       isApp : false
     };
 
-    if (this.config.product === 'appAutomation') lambdaCredentials.isApp =true
+    if (this._config.product === 'appAutomation') lambdaCredentials.isApp =true
 
-    if (this.config.logFile) {
-      lambdaCredentials.logFile = this.config.logFile;
+    if (this._config.logFile) {
+      lambdaCredentials.logFile = this._config.logFile;
     }
 
     this.isServiceEnabled = lambdaCredentials.username && lambdaCredentials.accessKey;
 
     try {
-      this.api = LambdaRestClient.AutomationClient(lambdaCredentials);
+      this._api = LambdaRestClient.AutomationClient(lambdaCredentials);
     } catch (_) {
       this.isServiceEnabled = false;
     }
   }
 
-  beforeScenario(world, context) {
-    if (!this.suiteTitle){
-      this.suiteTitle = world?.gherkinDocument?.feature?.name|| context?.document?.feature?.name || world?.pickle?.name || 'unknown scenario';
+  async beforeScenario(world, context) {
+    if (!this.suiteTitle) {
+      this.suiteTitle =
+        world?.gherkinDocument?.feature?.name ||
+        context?.document?.feature?.name ||
+        world?.pickle?.name ||
+        'unknown scenario';
+      await this.setSessionName(this.suiteTitle);
     }
   }
 
@@ -63,7 +85,7 @@ export default class LambdaRestService {
     this.suiteTitle = suite.title;
 
     if (suite.title && suite.title !== 'Jasmine__TopLevel__Suite') {
-      await this._setSessionName(suite.title);
+      await this.setSessionName(suite.title);
     }
   }
 
@@ -89,12 +111,21 @@ export default class LambdaRestService {
       }
     }
 
-    await this._setSessionName(suiteTitle);
+    await this.setSessionName(suiteTitle);
   }
 
-  beforeStep(step) {
+  async beforeFeature(uri, feature) {
+    this.suiteTitle = feature.name;
+    await this.setSessionName(this.suiteTitle);
+  }
+
+  async beforeStep(step) {
     if (!this.suiteTitle || this.suiteTitle == 'unknown scenario') {
-      this.suiteTitle = step?.document?.feature?.name || step?.step?.scenario?.name || 'unknown scenario';
+      this.suiteTitle =
+        step.document?.feature?.name ||
+        step.step?.scenario?.name ||
+        'unknown scenario';
+      await this.setSessionName(this.suiteTitle);
     }
   }
 
@@ -111,7 +142,7 @@ export default class LambdaRestService {
     passed,
     retries
   }) {
-    this._specsRan = true;
+    this.specsRan = true;
     console.log(error, result, duration, retries);
 
     // remove failure if test was retried and passed
@@ -142,10 +173,14 @@ export default class LambdaRestService {
   }
 
   afterScenario(world, { passed, error, duration }) {
-    this._specsRan = true;
+    this.specsRan = true;
     console.log(error, duration);
     if (!passed) {
       ++this.failures;
+    }
+    const status = world.result?.status.toLowerCase();
+    if (status !== 'skipped') {
+      this.scenariosThatRan.push(world.pickle.name || 'unknown pickle name');
     }
   }
 
@@ -158,13 +193,21 @@ export default class LambdaRestService {
 
     // set failures if user has bail option set in which case afterTest and
     // afterSuite aren't executed before after hook
-    if (this.config.mochaOpts && this.config.mochaOpts.bail && Boolean(result)) {
+    if (this._config.mochaOpts && this._config.mochaOpts.bail && Boolean(result)) {
       failures = 1;
     }
 
     if (result === 0) {
       failures = 0;
     }
+
+    const { preferScenarioName } = this.options;
+    // For Cucumber: Checks scenarios that ran (i.e. not skipped) on the session
+    // Only 1 Scenario ran and option enabled => Redefine session name to Scenario's name
+    if (preferScenarioName && this.scenariosThatRan.length === 1){
+      this.fullTitle = this.scenariosThatRan.pop();
+    }
+
     const status = 'status: ' + (failures > 0 ? 'failed' : 'passed');
 
     if (!this._browser.isMultiremote) {
@@ -172,13 +215,13 @@ export default class LambdaRestService {
       return this._update(this._browser.sessionId, failures);
     }
 
-    return Promise.all(Object.keys(this.capabilities).map(browserName => {
+    return Promise.all(Object.keys(this._capabilities).map(browserName => {
       log.info(`Update multiremote job for browser '${browserName}' and sessionId ${this._browser[browserName].sessionId}, ${status}`);
       return this._update(this._browser[browserName].sessionId, failures, false, browserName);
     }));
   }
 
-  onReload(oldSessionId, newSessionId) {
+  async onReload(oldSessionId, newSessionId) {
     if (!this.isServiceEnabled) {
       return;
     }
@@ -187,12 +230,16 @@ export default class LambdaRestService {
 
     if (!this._browser.isMultiremote) {
       log.info(`Update (reloaded) job with sessionId ${oldSessionId}, ${status}`);
-      return this._update(oldSessionId, this.failures, true);
+      await this._update(oldSessionId, this.failures, true);
+    } else {
+      const browserName = this._browser.instances.filter(browserName => this._browser[browserName].sessionId === newSessionId)[0];
+      log.info(`Update (reloaded) multiremote job for browser '${browserName}' and sessionId ${oldSessionId}, ${status}`);
+      await this._update(oldSessionId, this.failures, true, browserName);
     }
 
-    const browserName = this._browser.instances.filter(browserName => this._browser[browserName].sessionId === newSessionId)[0];
-    log.info(`Update (reloaded) multiremote job for browser '${browserName}' and sessionId ${oldSessionId}, ${status}`);
-    return this._update(oldSessionId, this.failures, true, browserName);
+    this.scenariosThatRan = [];
+    delete this.suiteTitle;
+    delete this.fullTitle;
   }
 
   async _update ( sessionId, failures, calledOnReload = false, browserName ) {
@@ -204,34 +251,39 @@ export default class LambdaRestService {
 
   async updateJob(sessionId, failures, calledOnReload = false, browserName) {
     const body = this.getBody(failures, calledOnReload, browserName);
-    try{
-    await new Promise((resolve, reject) => {
-      this.api.updateSessionById(sessionId, body, (err, result) => {
-        if (err) {
-          return reject(err);
+    try {
+      await new Promise((resolve, reject) => {
+        if (!this._api) {
+          return reject(new Error('LambdaTest service is not enabled'));
         }
-
-        return resolve(result);
+        this._api.updateSessionById(sessionId, body, (err, result) => {
+          if (err) {
+            return reject(err);
+          }
+          return resolve(result);
+        });
       });
-    });
-  }
-  catch(ex){
-    console.log(ex);
-  }
+    } catch(ex) {
+      console.log(ex);
+    }
     this.failures = 0;
   }
 
   getBody(failures, calledOnReload = false, browserName) {
     let body = {};
-    if (!(!this._browser.isMultiremote && this.capabilities.name || this._browser.isMultiremote && this.capabilities[browserName].capabilities.name)) {
-      let testName = this.suiteTitle
-      
-      body.name = testName
-      
-      if (this.capabilities['LT:Options'] && this.capabilities['LT:Options'].name){
-        body.name = this.capabilities['LT:Options'].name
+    if (
+      !(
+        (!this._browser.isMultiremote && this._capabilities.name) ||
+        (this._browser.isMultiremote &&
+          this._capabilities[browserName].capabilities.name)
+      )
+    ) {
+      body.name = this.fullTitle;
+
+      if (this._capabilities['LT:Options'] && this._capabilities['LT:Options'].name) {
+        body.name = this._capabilities['LT:Options'].name;
       }
-      
+
       if (browserName) {
         body.name = `${browserName}: ${body.name}`;
       }
@@ -246,9 +298,34 @@ export default class LambdaRestService {
         body.name += ` (${testCnt})`;
       }
     }
-
     body.status_ind = failures > 0 ? 'failed' : 'passed';
     return body;
+  }
+
+  async setSessionName(suiteTitle, test) {
+    if (!this.options.setSessionName || !suiteTitle) {
+        return;
+    }
+
+    let name = suiteTitle;
+    if (this.options.sessionNameFormat) {
+      name = this.options.sessionNameFormat(
+          this._config,
+          this._capabilities,
+          suiteTitle,
+          test?.title
+      );
+    } else if (test && !test.fullName) {
+      // Mocha
+      const pre = this.options.sessionNamePrependTopLevelSuiteTitle ? `${suiteTitle} - ` : '';
+      const post = !this.options.sessionNameOmitTestTitle ? ` - ${test.title}` : '';
+      name = `${pre}${test.parent}${post}`;
+    }
+
+    if (name !== this._fullTitle) {
+      this._fullTitle = name;
+      await this._setSessionName(name);
+    }
   }
 
   async _setSessionName(sessionName) {
@@ -260,7 +337,7 @@ export default class LambdaRestService {
       return;
     }
     if (this._browser.isMultiremote) {
-      return Promise.all(Object.keys(this.capabilities).map(async (browserName) => {
+      return Promise.all(Object.keys(this._capabilities).map(async (browserName) => {
         const browser = this._browser[browserName];
         return await browser.execute(cmd);
       }));
