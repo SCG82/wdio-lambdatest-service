@@ -5,23 +5,12 @@ WebdriverIO LambdaTest Service
 
 > A WebdriverIO service that manages tunnel and job metadata for LambdaTest users.
 
+This is a fork of the [wdio-lambdatest-service](https://github.com/LambdaTest/wdio-lambdatest-service) service that adds session naming options from the [wdio-browserstack-service](https://github.com/webdriverio/webdriverio/tree/main/packages/wdio-browserstack-service) service.
+
 ## Installation
 
-
-The easiest way is to keep `wdio-lambdatest-service` as a devDependency in your `package.json`.
-
-```json
-{
-    "devDependencies": {
-        "wdio-lambdatest-service": "^1.0.1"
-    }
-}
-```
-
-You can simple do it by:
-
 ```bash
-npm i wdio-lambdatest-service --save-dev
+npm i @scg82/wdio-lambdatest-service --save-dev
 ```
 
 Instructions on how to install `WebdriverIO` can be found [here.](https://webdriver.io/docs/gettingstarted.html)
@@ -33,7 +22,7 @@ WebdriverIO has LambdaTest support out of the box. You should simply set `user` 
 
 ```js
 // wdio.conf.js
-export.config = {
+exports.config = {
     // ...
     user: process.env.LT_USERNAME,
     key: process.env.LT_ACCESS_KEY,
@@ -63,10 +52,49 @@ Specified optional will be passed down to LambdaTest Tunnel. See [this list](htt
 Type: `Object`<br>
 Default: `{}`
 
+### preferScenarioName
+Cucumber only. Set the session name to the Scenario name if only a single Scenario ran.
+Useful when running in parallel with [wdio-cucumber-parallel-execution](https://github.com/SimitTomar/wdio-cucumber-parallel-execution).
+
+Type: `Boolean`<br />
+Default: `false`
+
+### sessionNameFormat
+Customize the session name format.
+
+Type: `Function`<br />
+Default (Cucumber/Jasmine): `(config, capabilities, suiteTitle) => suiteTitle`<br />
+Default (Mocha): `(config, capabilities, suiteTitle, testTitle) => suiteTitle + ' - ' + testTitle`
+
+### sessionNameOmitTestTitle
+Mocha only. Do not append the test title to the session name.
+
+Type: `Boolean`<br />
+Default: `false`
+
+### sessionNamePrependTopLevelSuiteTitle
+Mocha only. Prepend the top level suite title to the session name.
+
+Type: `Boolean`<br />
+Default: `false`
+
+### setSessionName
+Automatically set the session name.
+
+Type: `Boolean`<br />
+Default: `true`
+
+### setSessionStatus
+Automatically set the session status (passed/failed).
+
+Type: `Boolean`<br />
+Default: `true`
+
+
 ## Steps to compile and publish
 1. git clone this repository.
 2. run "npm install"
-3. run "npm run compile"
+3. run "npm run build"
 4. Steps to Publish: run "npm login"
 5. run "npm publish --access public"
 
