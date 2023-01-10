@@ -4,4 +4,6 @@ node_modules
 tests
 *.log
 .eslintcache
+.*
 /.github/workflows
+babel.config.js

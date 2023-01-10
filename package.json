@@ -1,15 +1,15 @@
 {
-  "name": "wdio-lambdatest-service",
-  "version": "1.0.15",
+  "name": "@mfc/lambdatest-service",
+  "version": "0.1.0",
   "description": "A WebdriverIO service that manages tunnel and job metadata for LambdaTest.",
   "author": "LambdaTest <keys@lambdatest.com>",
   "contributors": [
     "LambdaTest <keys@lambdatest.com> (https://www.npmjs.com/~lambdatestdev)"
   ],
-  "homepage": "https://github.com/LambdaTest/wdio-lambdatest-service",
+  "homepage": "https://spark.metapeer.com/mfc/mfc-lambdatest-service",
   "repository": {
     "type": "git",
-    "url": "git://github.com/LambdaTest/wdio-lambdatest-service.git"
+    "url": "git://spark.metapeer.com/mfc/mfc-lambdatest-service.git"
   },
   "license": "MIT",
   "main": "./build/index",
@@ -20,6 +20,7 @@
     "build": "run-s clean compile",
     "clean": "rimraf ./build",
     "compile": "babel src/ -d build/ --config-file ./babel.config.js",
+    "lint:staged": "LIST=`git diff-index --cached --name-only --diff-filter=d HEAD | grep -E .*\\.[cm]?[jt]sx?$`; if [ \"$LIST\" ]; then eslint --fix $LIST; fi",
     "test": "run-s test:*",
     "test:eslint": "eslint --cache src tests",
     "test:coverage": "jest --coverage --watchAll=false || exit 0"
@@ -31,13 +32,13 @@
     "lambdatest"
   ],
   "bugs": {
-    "url": "https://github.com/LambdaTest/wdio-lambdatest-service/issues"
+    "url": "https://spark.metapeer.com/mfc/mfc-lambdatest-service/issues"
   },
   "dependencies": {
-    "@lambdatest/node-rest-client": "^1.0.3",
-    "@lambdatest/node-tunnel": "^3.0.7",
-    "@wdio/logger": "6.0.0-alpha.0",
-    "source-map-support": "^0.5.16"
+    "@lambdatest/node-rest-client": "^1.0.5",
+    "@lambdatest/node-tunnel": "^3.0.11",
+    "@wdio/logger": "7.0.0",
+    "source-map-support": "^0.5.21"
   },
   "peerDependencies": {
     "@wdio/cli": "^7.0.0"
@@ -77,7 +78,7 @@
   },
   "husky": {
     "hooks": {
-      "pre-commit": "git diff-index --name-only --diff-filter=d HEAD | grep -E \"(.*)\\.js$\" | xargs node_modules/eslint/bin/eslint.js -c .eslintrc.js",
+      "pre-commit": "npm run lint:staged",
       "pre-push": "npm run test:eslint"
     }
   },
@@ -104,5 +105,8 @@
     "lockfiles": {
       "outOfRangeUpdatesOnly": true
     }
+  },
+  "directories": {
+    "test": "tests"
   }
 }
