@@ -1,12 +1,32 @@
 import LambdaRestClient from '@lambdatest/node-rest-client'
 import logger from '@wdio/logger'
 
+import { getParentSuiteName } from './util.js'
+
 const log = logger('@wdio/lambdatest-service')
 
 export default class LambdaRestService {
-  constructor() {
+  _browser;
+  _specsRan = false;
+  api;
+  capabilities
+  config;
+  failures = 0;
+  isServiceEnabled = true;
+  options;
+  suiteTitle;
+  testCnt = 0;
+
+  constructor(options, capabilities, config) {
+    this.capabilities = capabilities;
+    this.config = config;
+    this.options = options;
     this.testCnt = 0;
     this.failures = 0;
+  }
+
+  before(caps, specs, browser) {
+    this._browser = browser;
   }
 
   beforeSession(config, capabilities) {
@@ -32,29 +52,44 @@ export default class LambdaRestService {
       this.isServiceEnabled = false;
     }
   }
+
   beforeScenario(world, context) {
     if (!this.suiteTitle){
       this.suiteTitle = world?.gherkinDocument?.feature?.name|| context?.document?.feature?.name || world?.pickle?.name || 'unknown scenario';
     }
   }
 
-  beforeSuite(suite) {
+  async beforeSuite(suite) {
     this.suiteTitle = suite.title;
+
+    if (suite.title && suite.title !== 'Jasmine__TopLevel__Suite') {
+      await this._setSessionName(suite.title);
+    }
   }
 
-  beforeTest(test) {
+  async beforeTest(test) {
     if (!this.isServiceEnabled) {
       return;
     }
-    if (test.title && !this.testTitle){
-      this.testTitle = test.title
+
+    if (test.title && !this.testTitle) {
+      this.testTitle = test.title;
     }
-    
-    if (this.suiteTitle === 'Jasmine__TopLevel__Suite') {
+
+    let suiteTitle = this.suiteTitle;
+
+    if (test.fullName) {
+      // For Jasmine, `suite.title` is `Jasmine__TopLevel__Suite`.
+      // This tweak allows us to set the real suite name.
       const testSuiteName = test.fullName.slice(0, test.fullName.indexOf(test.description || '') - 1)
-      this.suiteTitle = testSuiteName;
-      global.browser.execute("lambda-name="+this.suiteTitle)
+      if (this.suiteTitle === 'Jasmine__TopLevel__Suite') {
+        suiteTitle = testSuiteName;
+      } else if (this.suiteTitle) {
+        suiteTitle = getParentSuiteName(this.suiteTitle, testSuiteName);
+      }
     }
+
+    await this._setSessionName(suiteTitle);
   }
 
   beforeStep(step) {
@@ -76,14 +111,39 @@ export default class LambdaRestService {
     passed,
     retries
   }) {
-    console.log(error, result, duration, retries)
-    if (!passed) {
+    this._specsRan = true;
+    console.log(error, result, duration, retries);
+
+    // remove failure if test was retried and passed
+    // (Mocha only)
+    if (test._retriedTest && passed) {
+      --this.failures;
+      return;
+    }
+
+    // don't bump failure number if test was retried and still failed
+    // (Mocha only)
+    if (
+      test._retriedTest &&
+      !passed &&
+      (
+        typeof test._currentRetry === 'number' &&
+        typeof test._retries === 'number' &&
+        test._currentRetry < test._retries
+      )
+    ) {
+      return;
+    }
+
+    const isJasminePendingError = typeof error === 'string' && error.includes('marked Pending');
+    if (!passed && !isJasminePendingError) {
       ++this.failures;
     }
   }
 
   afterScenario(world, { passed, error, duration }) {
-    console.log(error, duration)
+    this._specsRan = true;
+    console.log(error, duration);
     if (!passed) {
       ++this.failures;
     }
@@ -96,23 +156,25 @@ export default class LambdaRestService {
 
     let failures = this.failures;
 
-    if (global.browser.options.mochaOpts && global.browser.options.mochaOpts.bail && Boolean(result)) {
+    // set failures if user has bail option set in which case afterTest and
+    // afterSuite aren't executed before after hook
+    if (this.config.mochaOpts && this.config.mochaOpts.bail && Boolean(result)) {
       failures = 1;
     }
-    
+
     if (result === 0) {
       failures = 0;
     }
     const status = 'status: ' + (failures > 0 ? 'failed' : 'passed');
 
-    if (!global.browser.isMultiremote) {
-      log.info(`Update job with sessionId ${global.browser.sessionId}, ${status}`);
-      return this._update(global.browser.sessionId, failures);
+    if (!this._browser.isMultiremote) {
+      log.info(`Update job with sessionId ${this._browser.sessionId}, ${status}`);
+      return this._update(this._browser.sessionId, failures);
     }
 
     return Promise.all(Object.keys(this.capabilities).map(browserName => {
-      log.info(`Update multiremote job for browser '${browserName}' and sessionId ${global.browser[browserName].sessionId}, ${status}`);
-      return this._update(global.browser[browserName].sessionId, failures, false, browserName);
+      log.info(`Update multiremote job for browser '${browserName}' and sessionId ${this._browser[browserName].sessionId}, ${status}`);
+      return this._update(this._browser[browserName].sessionId, failures, false, browserName);
     }));
   }
 
@@ -123,12 +185,12 @@ export default class LambdaRestService {
 
     const status = 'status: ' + (this.failures > 0 ? 'failed' : 'passed');
 
-    if (!global.browser.isMultiremote) {
+    if (!this._browser.isMultiremote) {
       log.info(`Update (reloaded) job with sessionId ${oldSessionId}, ${status}`);
       return this._update(oldSessionId, this.failures, true);
     }
 
-    const browserName = global.browser.instances.filter(browserName => global.browser[browserName].sessionId === newSessionId)[0];
+    const browserName = this._browser.instances.filter(browserName => this._browser[browserName].sessionId === newSessionId)[0];
     log.info(`Update (reloaded) multiremote job for browser '${browserName}' and sessionId ${oldSessionId}, ${status}`);
     return this._update(oldSessionId, this.failures, true, browserName);
   }
@@ -136,7 +198,7 @@ export default class LambdaRestService {
   async _update ( sessionId, failures, calledOnReload = false, browserName ) {
     const sleep = ms => new Promise(r => setTimeout(r, ms));
     
-    await sleep(5000)
+    await sleep(5000);
     return await this.updateJob(sessionId, failures, calledOnReload, browserName);
   }
 
@@ -161,7 +223,7 @@ export default class LambdaRestService {
 
   getBody(failures, calledOnReload = false, browserName) {
     let body = {};
-    if (!(!global.browser.isMultiremote && this.capabilities.name || global.browser.isMultiremote && this.capabilities[browserName].capabilities.name)) {
+    if (!(!this._browser.isMultiremote && this.capabilities.name || this._browser.isMultiremote && this.capabilities[browserName].capabilities.name)) {
       let testName = this.suiteTitle
       
       body.name = testName
@@ -177,8 +239,8 @@ export default class LambdaRestService {
       if (calledOnReload || this.testCnt) {
         let testCnt = ++this.testCnt;
 
-        if (global.browser.isMultiremote) {
-          testCnt = Math.ceil(testCnt / global.browser.instances.length);
+        if (this._browser.isMultiremote) {
+          testCnt = Math.ceil(testCnt / this._browser.instances.length);
         }
 
         body.name += ` (${testCnt})`;
@@ -189,4 +251,20 @@ export default class LambdaRestService {
     return body;
   }
 
+  async _setSessionName(sessionName) {
+    await this._executeCommand(`lambda-name=${sessionName}`);
+  }
+
+  async _executeCommand(cmd) {
+    if (!this._browser) {
+      return;
+    }
+    if (this._browser.isMultiremote) {
+      return Promise.all(Object.keys(this.capabilities).map(async (browserName) => {
+        const browser = this._browser[browserName];
+        return await browser.execute(cmd);
+      }));
+    }
+    return await this._browser.execute(cmd);
+  }
 }
