@@ -111,7 +111,7 @@ export default class LambdaRestService {
       }
     }
 
-    await this.setSessionName(suiteTitle);
+    await this.setSessionName(suiteTitle, test);
   }
 
   async beforeFeature(uri, feature) {
