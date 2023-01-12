@@ -1,6 +1,6 @@
 import type { Services, Capabilities, Options, Frameworks } from '@wdio/types';
 import type { Browser, MultiRemoteBrowser } from 'webdriverio';
-import { LTOptions, SessionNameOptions } from './types.js';
+import type { LTOptions, SessionNameOptions } from './types.js';
 
 export default class LambdaRestService implements Services.ServiceInstance {
     private _api?;

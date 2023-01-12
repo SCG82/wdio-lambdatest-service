@@ -3,7 +3,7 @@ import type { Capabilities, Options } from '@wdio/types';
 
 export interface LambdaTestLauncherOptions {
     tunnel?: boolean;
-    lambdatestOpts?: LambdaTestTunnel.Options
+    lambdatestOpts?: LambdaTestTunnel.Options;
 }
 
 export default class LambdaTestLauncher {
@@ -13,5 +13,3 @@ export default class LambdaTestLauncher {
     onPrepare(config?: Options.Testrunner, capabilities?: Capabilities.RemoteCapabilities): Promise<unknown>;
     onComplete(): Promise<void> | undefined;
 }
-
-export {};

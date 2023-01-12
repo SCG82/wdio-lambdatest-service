@@ -14,7 +14,7 @@ const DEFAULT_OPTIONS = {
 export default class LambdaRestService {
   _api;
   _browser;
-  _capabilities
+  _capabilities;
   _config;
   failures = 0;
   failureStatuses = ['failed', 'ambiguous', 'undefined', 'unknown'];
@@ -55,7 +55,9 @@ export default class LambdaRestService {
       isApp : false
     };
 
-    if (this._config.product === 'appAutomation') lambdaCredentials.isApp =true
+    if (this._config.product === 'appAutomation') {
+      lambdaCredentials.isApp = true;
+    }
 
     if (this._config.logFile) {
       lambdaCredentials.logFile = this._config.logFile;
@@ -103,7 +105,7 @@ export default class LambdaRestService {
     if (test.fullName) {
       // For Jasmine, `suite.title` is `Jasmine__TopLevel__Suite`.
       // This tweak allows us to set the real suite name.
-      const testSuiteName = test.fullName.slice(0, test.fullName.indexOf(test.description || '') - 1)
+      const testSuiteName = test.fullName.slice(0, test.fullName.indexOf(test.description || '') - 1);
       if (this.suiteTitle === 'Jasmine__TopLevel__Suite') {
         suiteTitle = testSuiteName;
       } else if (this.suiteTitle) {
@@ -204,7 +206,7 @@ export default class LambdaRestService {
     const { preferScenarioName } = this.options;
     // For Cucumber: Checks scenarios that ran (i.e. not skipped) on the session
     // Only 1 Scenario ran and option enabled => Redefine session name to Scenario's name
-    if (preferScenarioName && this.scenariosThatRan.length === 1){
+    if (preferScenarioName && this.scenariosThatRan.length === 1) {
       this.fullTitle = this.scenariosThatRan.pop();
     }
 
@@ -244,7 +246,6 @@ export default class LambdaRestService {
 
   async _update ( sessionId, failures, calledOnReload = false, browserName ) {
     const sleep = ms => new Promise(r => setTimeout(r, ms));
-    
     await sleep(5000);
     return await this.updateJob(sessionId, failures, calledOnReload, browserName);
   }
@@ -263,7 +264,7 @@ export default class LambdaRestService {
           return resolve(result);
         });
       });
-    } catch(ex) {
+    } catch (ex) {
       console.log(ex);
     }
     this.failures = 0;
