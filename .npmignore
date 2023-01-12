@@ -4,4 +4,7 @@ node_modules
 tests
 *.log
 .eslintcache
+.eslintignore
 /.github/workflows
+.lambdatest/
+__mocks__
