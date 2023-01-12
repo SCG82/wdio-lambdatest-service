@@ -1,6 +1,6 @@
 {
   "name": "@scg82/wdio-lambdatest-service",
-  "version": "1.1.6",
+  "version": "1.2.0",
   "description": "A WebdriverIO service that manages tunnel and job metadata for LambdaTest.",
   "author": "LambdaTest <keys@lambdatest.com>",
   "contributors": [
