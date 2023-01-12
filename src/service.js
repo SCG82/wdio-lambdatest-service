@@ -1,3 +1,4 @@
+// @ts-check
 import LambdaRestClient from '@lambdatest/node-rest-client'
 import logger from '@wdio/logger'
 
@@ -137,15 +138,8 @@ export default class LambdaRestService {
     }
   }
 
-  afterTest(test, context, {
-    error,
-    result,
-    duration,
-    passed,
-    retries
-  }) {
+  afterTest(test, context, { error, passed }) {
     this.specsRan = true;
-    console.log(error, result, duration, retries);
 
     // remove failure if test was retried and passed
     // (Mocha only)
@@ -174,9 +168,8 @@ export default class LambdaRestService {
     }
   }
 
-  afterScenario(world, { passed, error, duration }) {
+  afterScenario(world, { passed }) {
     this.specsRan = true;
-    console.log(error, duration);
     if (!passed) {
       ++this.failures;
     }

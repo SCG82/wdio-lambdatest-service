@@ -54,7 +54,10 @@ export default class LambdaTestLauncher {
         return Promise.race([
             new Promise((resolve, reject) => {
                 this.lambdatestTunnelProcess.start(tunnelArguments, err => {
-                    if (err) return reject(err)
+                    if (err) {
+                        obs.disconnect()
+                        return reject(err)
+                    }
                     /* istanbul ignore next */
                     this.lambdatestTunnelProcess.getTunnelName(tunnelName => {
                         if (Array.isArray(capabilities)) {
@@ -70,13 +73,17 @@ export default class LambdaTestLauncher {
                             else
                                 capabilities['LT:Options'].tunnelName = tunnelName
                         }
+                        obs.disconnect()
                         resolve()
                     })
                 })
             }),
             new Promise((resolve, reject) => {
                 /* istanbul ignore next */
-                timer = setTimeout(() => { reject( new Error(TUNNEL_START_FAILED)) }, TUNNEL_STOP_TIMEOUT)
+                timer = setTimeout(() => {
+                    obs.disconnect()
+                    reject(new Error(TUNNEL_START_FAILED))
+                }, TUNNEL_STOP_TIMEOUT)
             })
         ]).then(
             /* istanbul ignore next */
@@ -84,10 +91,12 @@ export default class LambdaTestLauncher {
                 clearTimeout(timer)
                 performance.mark('ltTunnelEnd')
                 performance.measure('bootTime', 'ltTunnelStart', 'ltTunnelEnd')
+                obs.disconnect()
                 return Promise.resolve(result)
             },
             (err) => {
                 clearTimeout(timer)
+                obs.disconnect()
                 return Promise.reject(err)
             }
         )
