@@ -1,14 +1,15 @@
 WebdriverIO LambdaTest Service
 ========================
 
-[![WDIO health check](https://github.com/LambdaTest/wdio-lambdatest-service/actions/workflows/healthcheck.yml/badge.svg?branch=master)](https://github.com/LambdaTest/wdio-lambdatest-service/actions/workflows/healthcheck.yml)
+[![CI](https://spark.metapeer.com/mfc/mfc-lambdatest-service/actions/workflows/ci.yml/badge.svg)](https://spark.metapeer.com/mfc/mfc-lambdatest-service/actions/workflows/ci.yml)
+
 
 > A WebdriverIO service that manages tunnel and job metadata for LambdaTest users.
 
 ## Installation
 
 ```bash
-npm i wdio-lambdatest-service --save-dev
+npm i @mfc/lambdatest-service --save-dev
 ```
 
 Instructions on how to install `WebdriverIO` can be found [here.](https://webdriver.io/docs/gettingstarted.html)
