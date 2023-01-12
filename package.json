@@ -1,18 +1,19 @@
 {
-  "name": "wdio-lambdatest-service",
-  "version": "1.0.15",
+  "name": "@scg82/wdio-lambdatest-service",
+  "version": "1.1.6",
   "description": "A WebdriverIO service that manages tunnel and job metadata for LambdaTest.",
   "author": "LambdaTest <keys@lambdatest.com>",
   "contributors": [
     "LambdaTest <keys@lambdatest.com> (https://www.npmjs.com/~lambdatestdev)"
   ],
-  "homepage": "https://github.com/LambdaTest/wdio-lambdatest-service",
+  "homepage": "https://github.com/SCG82/wdio-lambdatest-service",
   "repository": {
     "type": "git",
-    "url": "git://github.com/LambdaTest/wdio-lambdatest-service.git"
+    "url": "git://github.com/SCG82/wdio-lambdatest-service.git"
   },
   "license": "MIT",
-  "main": "./build/index",
+  "main": "./build/index.js",
+  "types": "./build/index.d.ts",
   "engines": {
     "node": ">=10.0.0"
   },
@@ -33,7 +34,7 @@
     "lambdatest"
   ],
   "bugs": {
-    "url": "https://github.com/LambdaTest/wdio-lambdatest-service/issues"
+    "url": "https://github.com/SCG82/wdio-lambdatest-service/issues"
   },
   "dependencies": {
     "@lambdatest/node-rest-client": "^1.0.3",

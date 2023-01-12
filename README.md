@@ -5,10 +5,12 @@ WebdriverIO LambdaTest Service
 
 > A WebdriverIO service that manages tunnel and job metadata for LambdaTest users.
 
+This is a fork of the [wdio-lambdatest-service](https://github.com/LambdaTest/wdio-lambdatest-service) service that adds session naming options from the [wdio-browserstack-service](https://github.com/webdriverio/webdriverio/tree/main/packages/wdio-browserstack-service) service.
+
 ## Installation
 
 ```bash
-npm i wdio-lambdatest-service --save-dev
+npm i @scg82/wdio-lambdatest-service --save-dev
 ```
 
 Instructions on how to install `WebdriverIO` can be found [here.](https://webdriver.io/docs/gettingstarted.html)
