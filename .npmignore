@@ -5,6 +5,8 @@ tests
 *.log
 .eslintcache
 .eslintignore
+babel.config.js
 /.github/workflows
 .lambdatest/
 __mocks__
+.*
